@@ -14,7 +14,7 @@ export async function saveRequest(prompt) {
     const { data, error } = await supabase
       .from('requests')
       .insert([{ prompt, status: 'pending' }])
-      .select()
+      .select('id')
       .single()
 
     if (error) {
@@ -22,7 +22,40 @@ export async function saveRequest(prompt) {
       return null
     }
 
-    return data?.id || data?.insertedId
+    return data?.id ?? null
+  } catch (e) {
+    console.error('[Supabase] Exception:', e?.message || e)
+    return null
+  }
+}
+
+export async function saveFormRequest(values) {
+  return saveRequest(JSON.stringify(values))
+}
+
+export async function saveMessage({ name, email, subject, message }) {
+  if (!isSupabaseConfigured()) {
+    if (import.meta.env.DEV) {
+      console.warn('[Supabase] saveMessage skipped: set VITE_SUPABASE_URL and a public key in .env')
+    }
+    return null
+  }
+
+  const supabase = getSupabase()
+
+  try {
+    const { data, error } = await supabase
+      .from('messages')
+      .insert([{ name, email, subject, message, read: false }])
+      .select('id')
+      .single()
+
+    if (error) {
+      console.error('[Supabase] Error saving message:', error.message, error.details)
+      return null
+    }
+
+    return data?.id ?? null
   } catch (e) {
     console.error('[Supabase] Exception:', e?.message || e)
     return null
@@ -30,7 +63,7 @@ export async function saveRequest(prompt) {
 }
 
 export async function updateRequest(id, imageData) {
-  if (!isSupabaseConfigured()) return
+  if (!isSupabaseConfigured() || !id) return false
 
   const supabase = getSupabase()
   const { error } = await supabase
@@ -40,7 +73,10 @@ export async function updateRequest(id, imageData) {
 
   if (error) {
     console.error('[Supabase] Error updating request:', error)
+    return false
   }
+
+  return true
 }
 
 export async function getAllRequests() {
@@ -49,8 +85,9 @@ export async function getAllRequests() {
   const supabase = getSupabase()
   const { data, error } = await supabase
     .from('requests')
-    .select('*')
+    .select('id, prompt, status, created_at')
     .order('created_at', { ascending: false })
+    .limit(200)
 
   if (error) return []
   return data

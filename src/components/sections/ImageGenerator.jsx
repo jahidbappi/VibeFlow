@@ -4,13 +4,31 @@ import { SectionHeader } from '../ui/SectionHeader'
 import { Button } from '../ui/Button'
 import { Spinner } from '../ui/Spinner'
 import { generateImage, ImageGenerationError } from '../../lib/api/generateImage'
-import { saveRequest } from '../../lib/api/supabase'
+import { saveRequest, updateRequest } from '../../lib/api/supabase'
 import { promptPresets } from '../../data/promptPresets'
 import { Wand2, ImageIcon, Download, RefreshCcw, Trash2 } from '../../icons'
 import { useToast } from '../../context/useToast'
 
 const HISTORY_KEY = 'vibeflow:generation-history'
 const HISTORY_LIMIT = 8
+
+async function blobUrlToBase64(url) {
+  const response = await fetch(url)
+  const blob = await response.blob()
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const result = reader.result
+      if (typeof result !== 'string') {
+        reject(new Error('Failed to read generated image'))
+        return
+      }
+      resolve(result.split(',')[1] || '')
+    }
+    reader.onerror = () => reject(reader.error || new Error('Failed to read generated image'))
+    reader.readAsDataURL(blob)
+  })
+}
 
 function loadHistory() {
   try {
@@ -60,6 +78,16 @@ export function ImageGeneratorSection() {
       const url = await generateImage(trimmed, { signal: controller.signal })
       setImage({ url, prompt: trimmed, at: Date.now(), requestId })
       setHistory((prev) => [{ url, prompt: trimmed, at: Date.now(), requestId: requestId || Date.now() }, ...prev].slice(0, HISTORY_LIMIT))
+
+      if (requestId) {
+        blobUrlToBase64(url)
+          .then((base64) => updateRequest(requestId, base64))
+          .catch((err) => {
+            if (import.meta.env.DEV) {
+              console.warn('[Supabase] Failed to persist generated image:', err?.message || err)
+            }
+          })
+      }
     } catch (err) {
       if (err?.name === 'AbortError') return
       if (err instanceof ImageGenerationError) {

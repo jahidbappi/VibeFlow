@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { RequestForm } from '../forms/RequestForm'
 import { useToast } from '../../context/useToast'
+import { submitProjectRequest } from '../../lib/submitProjectRequest'
 import { Check } from '../../icons'
 
 export function RequestModal({ isOpen, onClose }) {
@@ -19,8 +20,11 @@ export function RequestModal({ isOpen, onClose }) {
   }, [onClose])
 
   const handleSubmit = async (values) => {
-    await new Promise((r) => setTimeout(r, 600))
-    console.log('[RequestForm] submission', values)
+    const { saved } = await submitProjectRequest(values)
+    if (!saved) {
+      toast.error('Could not save request', 'Please try again or email us directly.')
+      return
+    }
     setSubmittedName(values.name)
     setSubmitted(true)
     toast.success('Request submitted', "We'll reach out within 24 hours.")

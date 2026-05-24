@@ -4,6 +4,7 @@ import { useSEO } from '../hooks/useSEO'
 import { Button } from '../components/ui/Button'
 import { RequestForm } from '../components/forms/RequestForm'
 import { useToast } from '../context/useToast'
+import { submitProjectRequest } from '../lib/submitProjectRequest'
 import { env } from '../lib/env'
 
 export default function ContactPage() {
@@ -71,8 +72,11 @@ export default function ContactPage() {
             </p>
             <RequestForm
               onSubmit={async (values) => {
-                await new Promise((r) => setTimeout(r, 600))
-                console.log('[Contact form]', values)
+                const { saved } = await submitProjectRequest(values)
+                if (!saved) {
+                  toast.error('Could not send message', 'Please try again or email us directly.')
+                  return
+                }
                 toast.success('Message sent!', "We'll reach out within 24 hours.")
               }}
             />
